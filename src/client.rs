@@ -4,6 +4,8 @@ use std::io;
 use std::io::BufRead;
 use std::env;
 use std::thread;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::channel;
 use std::net::{SocketAddr, AddrParseError, TcpStream};
 
@@ -36,7 +38,7 @@ fn main() {
             let (input_tx, input_rx) = channel::<String>();
 
             let up_thread = thread::spawn(move || {
-                loop_write(input_rx, upstream);
+                loop_write(input_rx, upstream, Arc::new(AtomicBool::new(true)));
             });
 
             let input_thread = thread::spawn(move || {

@@ -4,6 +4,7 @@ use std::thread;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::net::{TcpListener, TcpStream};
 
 
@@ -16,9 +17,13 @@ fn write(msg: String, stream: &mut TcpStream) {
     stream.write(&[DELIMITER]).unwrap();
 }
 
-pub fn loop_write(input: Receiver<String>, mut stream: TcpStream) {
+pub fn loop_write(input: Receiver<String>, mut stream: TcpStream, until: Arc<AtomicBool>) {
     for msg in input.iter() {
-        write(msg, &mut stream);
+        if until.load(Ordering::SeqCst) {
+            write(msg, &mut stream);
+        } else {
+            break;
+        }
     }
 }
 
@@ -45,23 +50,27 @@ pub fn loop_read(output: Sender<String>, stream: TcpStream) {
 }
 
 fn handle_client(downstream: TcpStream, up: Sender<String>, down: Receiver<String>) {
-    println!("Client connected.");
-
     let upstream = downstream.try_clone().unwrap();
+    let alive = Arc::new(AtomicBool::new(true));
+    let alive_copy = alive.clone();
     thread::spawn(move || {
         loop_read(up, upstream);
+        alive_copy.store(false, Ordering::SeqCst);
     });
 
-    thread::spawn(move || {
-        loop_write(down, downstream);
+    let alive_copy_2 = alive.clone();
+    let w = thread::spawn(move || {
+        loop_write(down, downstream, alive_copy_2);
     });
+
+    w.join().unwrap();
 }
 
 pub fn listen() {
     let (up_tx, up_rx) = channel::<String>();
     let listener = TcpListener::bind("0.0.0.0:9001").unwrap();
 
-    let down_txs: HashMap<i32, Sender<String>> = HashMap::new();
+    let down_txs: HashMap<usize, Sender<String>> = HashMap::new();
     let down_txs_mutex = Arc::new(Mutex::new(down_txs));
 
     let down_txs_mutex_copy = down_txs_mutex.clone();
@@ -75,17 +84,22 @@ pub fn listen() {
         }
     });
 
-    let mut id = 0;
-    for stream in listener.incoming() {
+    for (id, stream) in listener.incoming().enumerate() {
         match stream {
             Ok(stream) => {
+                println!("Client connected, assigned id {}.", id);
                 let (down_tx, down_rx) = channel::<String>();
                 (*down_txs_mutex.lock().unwrap()).insert(id, down_tx);
                 let up_tx_copy = up_tx.clone();
-                thread::spawn(move || {
+                let h = thread::spawn(move || {
                     handle_client(stream, up_tx_copy, down_rx);
                 });
-                id += 1;
+                let down_txs_mutex_copy = down_txs_mutex.clone();
+                thread::spawn(move || {
+                    h.join().unwrap();
+                    (*down_txs_mutex_copy.lock().unwrap()).remove(&id);
+                    println!("Removed client {}.", id);
+                });
             },
             Err(msg) => {
                 println!("{}", msg);
