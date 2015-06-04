@@ -9,7 +9,6 @@ use std::net::{TcpListener, TcpStream};
 const DELIMITER: u8 = b"\0"[0];
 
 fn write(msg: String, stream: &mut TcpStream) {
-    println!("Writing message");
     for byte in msg.into_bytes() {
         stream.write(&[byte]).ok();
     }
@@ -18,7 +17,6 @@ fn write(msg: String, stream: &mut TcpStream) {
 
 pub fn loop_write(input: Receiver<String>, mut stream: TcpStream) {
     for msg in input.iter() {
-        println!("In loop_write: {:?}", msg);
         write(msg, &mut stream);
     }
 }
@@ -33,9 +31,9 @@ pub fn loop_read(output: Sender<String>, stream: TcpStream) {
                 println!("Socket closed.");
                 break;
             },
-            Ok(n) => {
+            Ok(_) => {
+                message.pop();  // Strip the delimiter.
                 let message_string = String::from_utf8(message).unwrap();
-                println!("Read {} bytes: {:?}", n, message_string);
                 output.send(message_string).ok();
             },
             _ => {
@@ -72,7 +70,6 @@ pub fn listen() {
             println!("{}", msg);
             let ref view = *down_txs_mutex_copy.lock().unwrap();
             for down_tx in view {
-                println!("Emit to down thread {:?}", msg.clone());
                 down_tx.send(msg.clone()).ok();
             }
         }
