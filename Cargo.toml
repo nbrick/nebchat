@@ -1,0 +1,8 @@
+[package]
+name = "nebchat"
+version = "0.1.0"
+authors = ["Nicolas Bricknell <nebricks@gmail.com>"]
+
+[lib]
+name = "nebchat"
+path = "src/lib.rs"
