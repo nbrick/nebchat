@@ -18,10 +18,8 @@ fn main() {
     match host {
         Ok(address) => {
             println!("Connecting to {}.", host_string);
-            let downstream = TcpStream::connect(address)
-                .ok().expect("Connect to host.");
-            let upstream = downstream.try_clone()
-                .ok().expect("Clone stream.");
+            let downstream = TcpStream::connect(address).unwrap();
+            let upstream = downstream.try_clone().unwrap();
 
             let (output_tx, output_rx) = channel::<String>();
 
@@ -44,14 +42,14 @@ fn main() {
             let input_thread = thread::spawn(move || {
                 let stdin  = io::stdin();
                 for line in stdin.lock().lines() {
-                    input_tx.send(line.unwrap()).ok();
+                    input_tx.send(line.unwrap()).unwrap();
                 }
             });
 
-            input_thread.join().ok();
-            output_thread.join().ok();
-            down_thread.join().ok();
-            up_thread.join().ok();
+            input_thread.join().unwrap();
+            output_thread.join().unwrap();
+            down_thread.join().unwrap();
+            up_thread.join().unwrap();
         },
         Err(msg) => {
             panic!("{:?}. Bad hostname?", msg);

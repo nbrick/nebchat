@@ -10,9 +10,9 @@ const DELIMITER: u8 = b"\0"[0];
 
 fn write(msg: String, stream: &mut TcpStream) {
     for byte in msg.into_bytes() {
-        stream.write(&[byte]).ok();
+        stream.write(&[byte]).unwrap();
     }
-    stream.write(&[DELIMITER]).ok();
+    stream.write(&[DELIMITER]).unwrap();
 }
 
 pub fn loop_write(input: Receiver<String>, mut stream: TcpStream) {
@@ -34,7 +34,7 @@ pub fn loop_read(output: Sender<String>, stream: TcpStream) {
             Ok(_) => {
                 message.pop();  // Strip the delimiter.
                 let message_string = String::from_utf8(message).unwrap();
-                output.send(message_string).ok();
+                output.send(message_string).unwrap();
             },
             _ => {
                 println!("Something unexpected...");
@@ -46,8 +46,7 @@ pub fn loop_read(output: Sender<String>, stream: TcpStream) {
 fn handle_client(downstream: TcpStream, up: Sender<String>, down: Receiver<String>) {
     println!("Client connected.");
 
-    let upstream = downstream.try_clone()
-        .ok().expect("Clone stream.");
+    let upstream = downstream.try_clone().unwrap();
     thread::spawn(move || {
         loop_read(up, upstream);
     });
@@ -70,7 +69,7 @@ pub fn listen() {
             println!("{}", msg);
             let ref view = *down_txs_mutex_copy.lock().unwrap();
             for down_tx in view {
-                down_tx.send(msg.clone()).ok();
+                down_tx.send(msg.clone()).unwrap();
             }
         }
     });
