@@ -6,3 +6,11 @@ authors = ["Nicolas Bricknell <nebricks@gmail.com>"]
 [lib]
 name = "nebchat"
 path = "src/lib.rs"
+
+[[bin]]
+name = "nebserve"
+path = "src/server.rs"
+
+[[bin]]
+name = "nebclient"
+path = "src/client.rs"
