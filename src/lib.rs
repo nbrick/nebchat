@@ -1,6 +1,7 @@
 use std::io::{Write, BufRead, BufReader};
 use std::string::String;
 use std::thread;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::net::{TcpListener, TcpStream};
@@ -60,7 +61,7 @@ pub fn listen() {
     let (up_tx, up_rx) = channel::<String>();
     let listener = TcpListener::bind("0.0.0.0:9001").unwrap();
 
-    let down_txs: Vec<Sender<String>> = Vec::new();
+    let down_txs: HashMap<i32, Sender<String>> = HashMap::new();
     let down_txs_mutex = Arc::new(Mutex::new(down_txs));
 
     let down_txs_mutex_copy = down_txs_mutex.clone();
@@ -68,21 +69,23 @@ pub fn listen() {
         for msg in up_rx.iter() {
             println!("{}", msg);
             let ref view = *down_txs_mutex_copy.lock().unwrap();
-            for down_tx in view {
+            for (_, down_tx) in view.iter() {
                 down_tx.send(msg.clone()).unwrap();
             }
         }
     });
 
+    let mut id = 0;
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 let (down_tx, down_rx) = channel::<String>();
-                (*down_txs_mutex.lock().unwrap()).push(down_tx);
+                (*down_txs_mutex.lock().unwrap()).insert(id, down_tx);
                 let up_tx_copy = up_tx.clone();
                 thread::spawn(move || {
                     handle_client(stream, up_tx_copy, down_rx);
                 });
+                id += 1;
             },
             Err(msg) => {
                 println!("{}", msg);
